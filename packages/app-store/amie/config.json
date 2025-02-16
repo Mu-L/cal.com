@@ -4,7 +4,7 @@
   "slug": "amie",
   "type": "amie_other",
   "logo": "icon.svg",
-  "url": "https://cal.com/apps/amie",
+  "url": "https://cal.com",
   "variant": "other",
   "categories": ["calendar"],
   "publisher": "Cal.com, Inc.",
@@ -12,5 +12,6 @@
   "description": "The joyful productivity app\r\r",
   "__createdUsingCli": true,
   "dependencies": ["google-calendar"],
-  "dirName": "amie"
+  "dirName": "amie",
+  "isOAuth": false
 }

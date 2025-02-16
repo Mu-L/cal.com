@@ -1,3 +1,5 @@
+"use client";
+
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from "@lexical/html";
 import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
 import {
@@ -26,8 +28,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "../../button";
-import { Dropdown, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../form/dropdown";
-import { Bold, ChevronDown, Italic, Link } from "../../icon";
+import { Dropdown, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../dropdown";
+import { Icon } from "../../icon";
 import type { TextEditorProps } from "../Editor";
 import { AddVariablesDropdown } from "./AddVariablesDropdown";
 
@@ -358,6 +360,7 @@ export default function ToolbarPlugin(props: TextEditorProps) {
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.updateTemplate]);
 
   useEffect(() => {
@@ -370,17 +373,31 @@ export default function ToolbarPlugin(props: TextEditorProps) {
         const nodes = $generateNodesFromDOM(editor, dom);
 
         $getRoot().select();
-        $insertNodes(nodes);
+        try {
+          $insertNodes(nodes);
+        } catch (e: unknown) {
+          // resolves: "topLevelElement is root node at RangeSelection.insertNodes"
+          // @see https://stackoverflow.com/questions/73094258/setting-editor-from-html
+          const paragraphNode = $createParagraphNode();
+          nodes.forEach((n) => paragraphNode.append(n));
+          $getRoot().append(paragraphNode);
+        }
 
         editor.registerUpdateListener(({ editorState, prevEditorState }) => {
           editorState.read(() => {
             const textInHtml = $generateHtmlFromNodes(editor).replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-            props.setText(textInHtml);
+            props.setText(
+              textInHtml.replace(
+                /<p\s+class="editor-paragraph"[^>]*>\s*<br>\s*<\/p>/g,
+                "<p class='editor-paragraph'></p>"
+              )
+            );
           });
           if (!prevEditorState._selection) editor.blur();
         });
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -392,7 +409,7 @@ export default function ToolbarPlugin(props: TextEditorProps) {
       }),
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
-        (_payload, newEditor) => {
+        (_payload, _newEditor) => {
           updateToolbar();
           return false;
         },
@@ -418,11 +435,11 @@ export default function ToolbarPlugin(props: TextEditorProps) {
             <Dropdown>
               <DropdownMenuTrigger className="text-subtle">
                 <>
-                  <span className={"icon" + blockType} />
+                  <span className={`icon${blockType}`} />
                   <span className="text text-default hidden sm:flex">
                     {blockTypeToBlockName[blockType as keyof BlockType]}
                   </span>
-                  <ChevronDown className="text-default ml-2 h-4 w-4" />
+                  <Icon name="chevron-down" className="text-default ml-2 h-4 w-4" />
                 </>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -438,7 +455,7 @@ export default function ToolbarPlugin(props: TextEditorProps) {
                           blockType === key ? "bg-subtle w-full" : ""
                         )}>
                         <>
-                          <span className={"icon block-type " + key} />
+                          <span className={`icon block-type ${key}`} />
                           <span>{blockTypeToBlockName[key]}</span>
                         </>
                       </Button>
@@ -456,7 +473,7 @@ export default function ToolbarPlugin(props: TextEditorProps) {
               color="minimal"
               variant="icon"
               type="button"
-              StartIcon={Bold}
+              StartIcon="bold"
               onClick={() => {
                 editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold");
               }}
@@ -468,7 +485,7 @@ export default function ToolbarPlugin(props: TextEditorProps) {
               color="minimal"
               variant="icon"
               type="button"
-              StartIcon={Italic}
+              StartIcon="italic"
               onClick={() => {
                 editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic");
               }}
@@ -481,7 +498,7 @@ export default function ToolbarPlugin(props: TextEditorProps) {
                 color="minimal"
                 variant="icon"
                 type="button"
-                StartIcon={Link}
+                StartIcon="link"
                 onClick={insertLink}
                 className={isLink ? "bg-subtle" : ""}
               />
@@ -490,11 +507,12 @@ export default function ToolbarPlugin(props: TextEditorProps) {
           )}
         </>
         {props.variables && (
-          <div className="ml-auto">
+          <div className={`${props.addVariableButtonTop ? "-mt-10" : ""} ml-auto`}>
             <AddVariablesDropdown
               addVariable={addVariable}
               isTextEditor={true}
               variables={props.variables || []}
+              addVariableButtonTop={props.addVariableButtonTop}
             />
           </div>
         )}

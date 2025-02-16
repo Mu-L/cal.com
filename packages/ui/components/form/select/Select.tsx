@@ -7,13 +7,19 @@ import cx from "@calcom/lib/classNames";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 
 import { Label } from "../inputs/Label";
+import { inputStyles } from "../inputs/TextField";
 import { getReactSelectProps } from "./selectTheme";
 
 export type SelectProps<
   Option,
   IsMulti extends boolean = false,
   Group extends GroupBase<Option> = GroupBase<Option>
-> = Props<Option, IsMulti, Group> & { variant?: "default" | "checkbox" };
+> = Props<Option, IsMulti, Group> & {
+  variant?: "default" | "checkbox";
+  "data-testid"?: string;
+  size?: "sm" | "md";
+  grow?: boolean;
+};
 
 export const Select = <
   Option,
@@ -21,11 +27,23 @@ export const Select = <
   Group extends GroupBase<Option> = GroupBase<Option>
 >({
   components,
-  menuPlacement,
   variant = "default",
+  size = "md",
+  grow,
   ...props
-}: SelectProps<Option, IsMulti, Group>) => {
-  const { classNames, ...restProps } = props;
+}: SelectProps<Option, IsMulti, Group> & {
+  innerClassNames?: {
+    input?: string;
+    option?: string;
+    control?: string;
+    singleValue?: string;
+    valueContainer?: string;
+    multiValue?: string;
+    menu?: string;
+    menuList?: string;
+  };
+}) => {
+  const { classNames, innerClassNames, menuPlacement = "auto", ...restProps } = props;
   const reactSelectProps = React.useMemo(() => {
     return getReactSelectProps<Option, IsMulti, Group>({
       components: components || {},
@@ -33,59 +51,78 @@ export const Select = <
     });
   }, [components, menuPlacement]);
 
+  const hasMultiLastIcons = props.isMulti || props.isLoading || props.isClearable;
+
   // Annoyingly if we update styles here we have to update timezone select too
   // We cant create a generate function for this as we can't force state changes - onSelect styles dont change for example
   return (
     <ReactSelect
       {...reactSelectProps}
+      menuPlacement={menuPlacement}
+      styles={{
+        control: (base) => ({
+          ...base,
+          minHeight: size === "sm" ? "28px" : "36px",
+          height: grow ? "h-auto " : size === "sm" ? "28px" : "36px",
+        }),
+      }}
       classNames={{
-        input: () => cx("text-emphasis", props.classNames?.input),
+        input: () => cx("text-emphasis", innerClassNames?.input),
         option: (state) =>
           cx(
-            "bg-default flex cursor-pointer justify-between py-2.5 px-3 rounded-none text-default ",
+            "bg-default flex cursor-pointer justify-between py-1.5 px-2 rounded-md text-default items-center",
             state.isFocused && "bg-subtle",
+            state.isDisabled && "bg-muted",
             state.isSelected && "bg-emphasis text-default",
-            props.classNames?.option
+            innerClassNames?.option
           ),
         placeholder: (state) => cx("text-muted", state.isFocused && variant !== "checkbox" && "hidden"),
         dropdownIndicator: () => "text-default",
         control: (state) =>
           cx(
-            "bg-default border-default !min-h-9 h-9 text-sm leading-4 placeholder:text-sm placeholder:font-normal focus-within:ring-2 focus-within:ring-emphasis hover:border-emphasis rounded-md border ",
+            inputStyles({ size }),
             state.isMulti
               ? variant === "checkbox"
-                ? "px-3 py-2 h-fit"
+                ? "px-3 h-fit"
                 : state.hasValue
                 ? "p-1 h-fit"
-                : "px-3 py-2 h-fit"
-              : "py-2 px-3 h-fit",
+                : "px-3 h-fit"
+              : size === "sm"
+              ? "h-7 px-2"
+              : "h-9 px-3",
             props.isDisabled && "bg-subtle",
-            props.classNames?.control
+            size === "sm" ? "rounded-md" : "rounded-[10px]",
+            "[&:focus-within]:border-emphasis [&:focus-within]:shadow-outline-gray-focused [&:focus-within]:ring-0 !flex",
+            innerClassNames?.control
           ),
-        singleValue: () => cx("text-emphasis placeholder:text-muted", props.classNames?.singleValue),
+        singleValue: () => cx("text-default placeholder:text-muted", innerClassNames?.singleValue),
         valueContainer: () =>
-          cx("text-emphasis placeholder:text-muted flex gap-1", props.classNames?.valueContainer),
+          cx("text-default placeholder:text-muted flex gap-1", innerClassNames?.valueContainer),
         multiValue: () =>
           cx(
-            "bg-subtle text-default rounded-md py-1.5 px-2 flex items-center text-sm leading-none",
-            props.classNames?.multiValue
+            "font-medium inline-flex items-center justify-center rounded bg-emphasis text-emphasis leading-none text-xs",
+            size == "sm" ? "px-1.5 py-[1px] rounded-md" : "py-1 px-1.5 leading-none rounded-lg"
           ),
         menu: () =>
           cx(
-            "rounded-md bg-default text-sm leading-4 text-default mt-1 border border-subtle",
-            props.classNames?.menu
+            "rounded-lg bg-default text-sm leading-4 text-default mt-1 border border-subtle shadow-dropdown p-1",
+            innerClassNames?.menu
           ),
-        groupHeading: () => "leading-none text-xs uppercase text-default pl-2.5 pt-4 pb-2",
-        menuList: () => cx("scroll-bar scrollbar-track-w-20 rounded-md", props.classNames?.menuList),
+        groupHeading: () => "leading-none text-xs text-muted p-2 font-medium ml-1",
+        menuList: () =>
+          cx(
+            "scroll-bar scrollbar-track-w-20 rounded-md flex flex-col space-y-[1px]",
+            innerClassNames?.menuList
+          ),
         indicatorsContainer: (state) =>
           cx(
             state.selectProps.menuIsOpen
-              ? state.isMulti
+              ? hasMultiLastIcons
                 ? "[&>*:last-child]:rotate-180 [&>*:last-child]:transition-transform"
                 : "rotate-180 transition-transform"
               : "text-default" // Woo it adds another SVG here on multi for some reason
           ),
-        multiValueRemove: () => "text-default py-auto ml-2",
+        multiValueRemove: () => "text-default py-auto",
         ...classNames,
       }}
       {...restProps}
@@ -115,7 +152,10 @@ export const SelectField = function SelectField<
     <div className={cx(containerClassName)}>
       <div className={cx(className)}>
         {!!label && (
-          <Label htmlFor={id} {...labelProps} className={cx(props.error && "text-error")}>
+          <Label
+            htmlFor={id}
+            {...labelProps}
+            className={cx(props.error && "text-error", props.labelProps?.className)}>
             {label}
           </Label>
         )}
@@ -140,7 +180,7 @@ export function SelectWithValidation<
 }: SelectProps<Option, IsMulti, Group> & { required?: boolean }) {
   const [hiddenInputValue, _setHiddenInputValue] = React.useState(() => {
     if (value instanceof Array || !value) {
-      return;
+      return "";
     }
     return value.value || "";
   });

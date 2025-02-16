@@ -1,4 +1,5 @@
-import { useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import dayjs from "@calcom/dayjs";
 import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
@@ -8,16 +9,7 @@ import type { RecordingItemSchema } from "@calcom/prisma/zod-utils";
 import type { RouterOutputs } from "@calcom/trpc/react";
 import { trpc } from "@calcom/trpc/react";
 import type { PartialReference } from "@calcom/types/EventManager";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  UpgradeTeamsBadge,
-} from "@calcom/ui";
-import { Button } from "@calcom/ui";
-import { Download } from "@calcom/ui/components/icon";
+import { Button, Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader } from "@calcom/ui";
 
 import RecordingListSkeleton from "./components/RecordingListSkeleton";
 
@@ -70,18 +62,21 @@ const useRecordingDownload = () => {
     },
     {
       enabled: !!recordingId,
-      cacheTime: 0,
+      gcTime: 0,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       retry: false,
-      onSuccess: (data) => {
-        if (data && data.download_link) {
-          window.location.href = data.download_link;
-        }
-      },
     }
   );
 
+  useEffect(
+    function refactorMeWithoutEffect() {
+      if (data && data.download_link) {
+        window.location.href = data.download_link;
+      }
+    },
+    [data]
+  );
   return {
     setRecordingId: (newRecordingId: string) => {
       // may be a way to do this by default, but this is easy enough.
@@ -101,6 +96,7 @@ const useRecordingDownload = () => {
 const ViewRecordingsList = ({ roomName, hasTeamPlan }: { roomName: string; hasTeamPlan: boolean }) => {
   const { t } = useLocale();
   const { setRecordingId, isFetching, recordingId } = useRecordingDownload();
+  const router = useRouter();
 
   const { data: recordings } = trpc.viewer.getCalVideoRecordings.useQuery(
     { roomName },
@@ -121,7 +117,7 @@ const ViewRecordingsList = ({ roomName, hasTeamPlan }: { roomName: string; hasTe
           {recordings.data.map((recording: RecordingItemSchema, index: number) => {
             return (
               <div
-                className="flex w-full items-center justify-between rounded-md border px-4 py-2"
+                className="border-subtle flex w-full items-center justify-between rounded-md border px-4 py-2"
                 key={recording.id}>
                 <div className="flex flex-col">
                   <h1 className="text-sm font-semibold">
@@ -131,14 +127,19 @@ const ViewRecordingsList = ({ roomName, hasTeamPlan }: { roomName: string; hasTe
                 </div>
                 {hasTeamPlan ? (
                   <Button
-                    StartIcon={Download}
+                    StartIcon="download"
                     className="ml-4 lg:ml-0"
                     loading={isFetching && recordingId === recording.id}
                     onClick={() => handleDownloadClick(recording.id)}>
                     {t("download")}
                   </Button>
                 ) : (
-                  <UpgradeTeamsBadge />
+                  <Button
+                    tooltip={t("upgrade_to_access_recordings_description")}
+                    className="ml-4 lg:ml-0"
+                    onClick={() => router.push("/teams")}>
+                    {t("upgrade")}
+                  </Button>
                 )}
               </div>
             );
@@ -157,7 +158,7 @@ export const ViewRecordingsDialog = (props: IViewRecordingsDialog) => {
   const { t, i18n } = useLocale();
   const { isOpenDialog, setIsOpenDialog, booking, timeFormat } = props;
 
-  const { hasTeamPlan, isLoading: isTeamPlanStatusLoading } = useHasTeamPlan();
+  const { hasTeamPlan, isPending: isTeamPlanStatusLoading } = useHasTeamPlan();
 
   const roomName =
     booking?.references?.find((reference: PartialReference) => reference.type === "daily_video")?.meetingId ??
@@ -174,7 +175,7 @@ export const ViewRecordingsDialog = (props: IViewRecordingsDialog) => {
 
   return (
     <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>
-      <DialogContent>
+      <DialogContent enableOverflow>
         <DialogHeader title={t("recordings_title")} subtitle={subtitle} />
         {roomName ? (
           <LicenseRequired>

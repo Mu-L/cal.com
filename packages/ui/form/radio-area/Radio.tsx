@@ -11,7 +11,7 @@ export const Radio = (props: RadioGroupPrimitive.RadioGroupItemProps & { childre
   <RadioGroupPrimitive.Item
     {...props}
     className={classNames(
-      "hover:bg-subtle border-default focus:ring-emphasis mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border focus:ring-2",
+      "hover:bg-subtle border-default dark:checked:bg-brand-default dark:hover:bg-subtle dark:checked:hover:bg-brand-default focus:ring-brand-default hover:border-emphasis me-1.5 mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border text-[--cal-brand] transition focus:border-0 focus:ring-1",
       props.disabled && "opacity-60"
     )}>
     {props.children}
@@ -20,8 +20,8 @@ export const Radio = (props: RadioGroupPrimitive.RadioGroupItemProps & { childre
 export const Indicator = ({ disabled }: { disabled?: boolean }) => (
   <RadioGroupPrimitive.Indicator
     className={classNames(
-      "after:bg-default dark:after:bg-inverted relative flex h-full w-full items-center justify-center rounded-full bg-black after:h-[6px] after:w-[6px] after:rounded-full after:content-['']",
-      disabled ? "after:bg-muted" : "bg-black"
+      "after:bg-default dark:after:bg-brand-accent relative flex h-full w-full items-center justify-center rounded-full bg-black after:h-[6px] after:w-[6px] after:rounded-full after:content-['']",
+      disabled ? "after:bg-muted" : "bg-brand-default"
     )}
   />
 );
@@ -42,14 +42,21 @@ export const RadioField = ({
   id,
   value,
   className,
+  withPadding,
 }: {
   label: string | ReactNode;
   disabled?: boolean;
   id: string;
   value: string;
   className?: string;
+  withPadding?: boolean;
 }) => (
-  <div className={classNames("flex items-start", className)}>
+  <div
+    className={classNames(
+      "flex items-start",
+      withPadding && "hover:bg-subtle cursor-pointer rounded-lg p-1.5",
+      className
+    )}>
     <Radio value={value} disabled={disabled} id={id}>
       <Indicator disabled={disabled} />
     </Radio>

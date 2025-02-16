@@ -1,21 +1,16 @@
-import type { GetStaticPropsContext } from "next";
+import withEmbedSsr from "@lib/withEmbedSsr";
 
-import { getStaticProps as _getStaticProps } from "../[type]";
+import PageWrapper from "@components/PageWrapper";
 
-export { getStaticPaths } from "../[type]";
+import { getServerSideProps as _getServerSideProps } from "@server/lib/[user]/[type]/getServerSideProps";
 
-export { default } from "../[type]";
+import type { PageProps } from "~/users/views/users-type-public-view";
+import TypePage from "~/users/views/users-type-public-view";
 
-export const getStaticProps = async (context: GetStaticPropsContext) => {
-  const staticResponse = await _getStaticProps(context);
-  if (staticResponse.notFound) {
-    return staticResponse;
-  }
-  return {
-    ...staticResponse,
-    props: {
-      ...staticResponse.props,
-      isEmbed: true,
-    },
-  };
-};
+export const getServerSideProps = withEmbedSsr(_getServerSideProps);
+
+const Type = (props: PageProps) => <TypePage {...props} />;
+
+Type.PageWrapper = PageWrapper;
+
+export default Type;

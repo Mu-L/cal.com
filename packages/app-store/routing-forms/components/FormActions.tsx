@@ -1,15 +1,17 @@
 import type { App_RoutingForms_Form } from "@prisma/client";
-import type { NextRouter } from "next/router";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 import { createContext, forwardRef, useContext, useState } from "react";
-import { useForm } from "react-hook-form";
-import { Controller } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
+import { useOrgBranding } from "@calcom/features/ee/organizations/context/provider";
+import { RoutingFormEmbedButton, RoutingFormEmbedDialog } from "@calcom/features/embed/RoutingFormEmbed";
+import { EmbedDialogProvider } from "@calcom/features/embed/lib/hooks/useEmbedDialogCtx";
 import { classNames } from "@calcom/lib";
-import { CAL_URL } from "@calcom/lib/constants";
+import { WEBSITE_URL } from "@calcom/lib/constants";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import slugify from "@calcom/lib/slugify";
 import { trpc } from "@calcom/trpc/react";
 import type { ButtonProps } from "@calcom/ui";
 import {
@@ -18,58 +20,52 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogFooter,
   Dropdown,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   Form,
+  SettingsToggle,
   showToast,
   Switch,
   TextAreaField,
   TextField,
-  SettingsToggle,
 } from "@calcom/ui";
-import { MoreHorizontal } from "@calcom/ui/components/icon";
-
-import { EmbedButton, EmbedDialog } from "@components/Embed";
 
 import getFieldIdentifier from "../lib/getFieldIdentifier";
 import type { SerializableForm } from "../types/types";
 
 type RoutingForm = SerializableForm<App_RoutingForms_Form>;
-
+export type NewFormDialogState = { action: "new" | "duplicate"; target: string | null } | null;
+export type SetNewFormDialogState = React.Dispatch<React.SetStateAction<NewFormDialogState>>;
 const newFormModalQuerySchema = z.object({
-  action: z.string(),
+  action: z.literal("new").or(z.literal("duplicate")),
   target: z.string().optional(),
 });
 
-const openModal = (router: NextRouter, option: { target?: string; action: string }) => {
-  const query = {
-    ...router.query,
-    dialog: "new-form",
-    ...option,
-  };
-  router.push(
-    {
-      pathname: router.pathname,
-      query,
-    },
-    undefined,
-    { shallow: true }
-  );
-};
-
-function NewFormDialog({ appUrl }: { appUrl: string }) {
+function NewFormDialog({
+  appUrl,
+  newFormDialogState,
+  setNewFormDialogState,
+}: {
+  appUrl: string;
+  newFormDialogState: NewFormDialogState;
+  setNewFormDialogState: SetNewFormDialogState;
+}) {
   const { t } = useLocale();
   const router = useRouter();
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
+
+  const action = newFormDialogState?.action;
+  const target = newFormDialogState?.target;
 
   const mutation = trpc.viewer.appRoutingForms.formMutation.useMutation({
     onSuccess: (_data, variables) => {
       router.push(`${appUrl}/form-edit/${variables.id}`);
     },
-    onError: () => {
-      showToast(t("something_went_wrong"), "error");
+    onError: (err) => {
+      showToast(err.message || t("something_went_wrong"), "error");
     },
     onSettled: () => {
       utils.viewer.appRoutingForms.forms.invalidate();
@@ -82,15 +78,18 @@ function NewFormDialog({ appUrl }: { appUrl: string }) {
     shouldConnect: boolean;
   }>();
 
-  const { action, target } = router.query as z.infer<typeof newFormModalQuerySchema>;
+  const formToDuplicate = action === "duplicate" ? target : null;
+  const teamId = action === "new" ? Number(target) : null;
 
   const { register } = hookForm;
   return (
-    <Dialog name="new-form" clearQueryParamsOnClose={["target", "action"]}>
+    <Dialog open={newFormDialogState !== null} onOpenChange={(open) => !open && setNewFormDialogState(null)}>
       <DialogContent className="overflow-y-auto">
-        <div className="mb-4">
-          <h3 className="text-emphasis text-lg font-bold leading-6" id="modal-title">
-            {t("add_new_form")}
+        <div className="mb-1">
+          <h3
+            className="text-emphasis !font-cal text-semibold leading-20 text-xl font-medium"
+            id="modal-title">
+            {teamId ? t("add_new_team_form") : t("add_new_form")}
           </h3>
           <div>
             <p className="text-subtle text-sm">{t("form_description")}</p>
@@ -105,10 +104,11 @@ function NewFormDialog({ appUrl }: { appUrl: string }) {
               id: formId,
               ...values,
               addFallback: true,
-              duplicateFrom: action === "duplicate" ? target : null,
+              teamId,
+              duplicateFrom: formToDuplicate,
             });
           }}>
-          <div className="mt-3 space-y-4">
+          <div className="mt-3 space-y-5">
             <TextField label={t("title")} required placeholder={t("a_routing_form")} {...register("name")} />
             <div className="mb-5">
               <TextAreaField
@@ -137,12 +137,12 @@ function NewFormDialog({ appUrl }: { appUrl: string }) {
               />
             )}
           </div>
-          <div className="mt-8 flex flex-row-reverse gap-x-2">
-            <Button loading={mutation.isLoading} data-testid="add-form" type="submit">
+          <DialogFooter showDivider className="mt-12">
+            <DialogClose />
+            <Button loading={mutation.isPending} data-testid="add-form" type="submit">
               {t("continue")}
             </Button>
-            <DialogClose />
-          </div>
+          </DialogFooter>
         </Form>
       </DialogContent>
     </Dialog>
@@ -150,19 +150,23 @@ function NewFormDialog({ appUrl }: { appUrl: string }) {
 }
 
 const dropdownCtx = createContext<{ dropdown: boolean }>({ dropdown: false });
-
-export const FormActionsDropdown = ({ form, children }: { form: RoutingForm; children: React.ReactNode }) => {
-  const { disabled } = form;
+export const FormActionsDropdown = ({
+  children,
+  disabled,
+}: {
+  disabled?: boolean;
+  children: React.ReactNode;
+}) => {
   return (
     <dropdownCtx.Provider value={{ dropdown: true }}>
       <Dropdown>
-        <DropdownMenuTrigger data-testid="form-dropdown" asChild>
+        <DropdownMenuTrigger disabled={disabled} data-testid="form-dropdown" asChild>
           <Button
             type="button"
             variant="icon"
             color="secondary"
             className={classNames("radix-state-open:rounded-r-md", disabled && "opacity-30")}
-            StartIcon={MoreHorizontal}
+            StartIcon="ellipsis"
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent>{children}</DropdownMenuContent>
@@ -176,29 +180,40 @@ function Dialogs({
   deleteDialogOpen,
   setDeleteDialogOpen,
   deleteDialogFormId,
+  newFormDialogState,
+  setNewFormDialogState,
 }: {
   appUrl: string;
   deleteDialogOpen: boolean;
   setDeleteDialogOpen: (open: boolean) => void;
   deleteDialogFormId: string | null;
+  newFormDialogState: NewFormDialogState | null;
+  setNewFormDialogState: SetNewFormDialogState;
 }) {
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
   const router = useRouter();
   const { t } = useLocale();
+
   const deleteMutation = trpc.viewer.appRoutingForms.deleteForm.useMutation({
     onMutate: async ({ id: formId }) => {
       await utils.viewer.appRoutingForms.forms.cancel();
       const previousValue = utils.viewer.appRoutingForms.forms.getData();
       if (previousValue) {
-        const filtered = previousValue.filter(({ id }) => id !== formId);
-        utils.viewer.appRoutingForms.forms.setData(undefined, filtered);
+        const filtered = previousValue.filtered.filter(({ form: { id } }) => id !== formId);
+        utils.viewer.appRoutingForms.forms.setData(
+          {},
+          {
+            ...previousValue,
+            filtered,
+          }
+        );
       }
       return { previousValue };
     },
     onSuccess: () => {
       showToast(t("form_deleted"), "success");
       setDeleteDialogOpen(false);
-      router.replace(`${appUrl}/forms`);
+      router.push(`${appUrl}/forms`);
     },
     onSettled: () => {
       utils.viewer.appRoutingForms.forms.invalidate();
@@ -206,17 +221,17 @@ function Dialogs({
     },
     onError: (err, newTodo, context) => {
       if (context?.previousValue) {
-        utils.viewer.appRoutingForms.forms.setData(undefined, context.previousValue);
+        utils.viewer.appRoutingForms.forms.setData({}, context.previousValue);
       }
       showToast(err.message || t("something_went_wrong"), "error");
     },
   });
   return (
     <div id="form-dialogs">
-      <EmbedDialog />
+      <RoutingFormEmbedDialog />
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <ConfirmationDialogContent
-          isLoading={deleteMutation.isLoading}
+          isPending={deleteMutation.isPending}
           variety="danger"
           title={t("delete_form")}
           confirmBtnText={t("delete_form_action")}
@@ -236,43 +251,67 @@ function Dialogs({
           </ul>
         </ConfirmationDialogContent>
       </Dialog>
-      <NewFormDialog appUrl={appUrl} />
+      <NewFormDialog
+        appUrl={appUrl}
+        newFormDialogState={newFormDialogState}
+        setNewFormDialogState={setNewFormDialogState}
+      />
     </div>
   );
 }
 
 const actionsCtx = createContext({
   appUrl: "",
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  setNewFormDialogState: null as SetNewFormDialogState | null,
+  newFormDialogState: null as NewFormDialogState,
   _delete: {
     // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/no-unused-vars
     onAction: (_arg: { routingForm: RoutingForm | null }) => {},
-    isLoading: false,
+    isPending: false,
   },
   toggle: {
     // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/no-unused-vars
     onAction: (_arg: { routingForm: RoutingForm | null; checked: boolean }) => {},
-    isLoading: false,
+    isPending: false,
   },
 });
 
-export function FormActionsProvider({ appUrl, children }: { appUrl: string; children: React.ReactNode }) {
+interface FormActionsProviderProps {
+  appUrl: string;
+  children: React.ReactNode;
+  newFormDialogState: NewFormDialogState;
+  setNewFormDialogState: SetNewFormDialogState;
+}
+
+export function FormActionsProvider({
+  appUrl,
+  children,
+  newFormDialogState,
+  setNewFormDialogState,
+}: FormActionsProviderProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteDialogFormId, setDeleteDialogFormId] = useState<string | null>(null);
   const { t } = useLocale();
-  const utils = trpc.useContext();
-
+  const utils = trpc.useUtils();
   const toggleMutation = trpc.viewer.appRoutingForms.formMutation.useMutation({
     onMutate: async ({ id: formId, disabled }) => {
       await utils.viewer.appRoutingForms.forms.cancel();
       const previousValue = utils.viewer.appRoutingForms.forms.getData();
       if (previousValue) {
-        const itemIndex = previousValue.findIndex(({ id }) => id === formId);
-        const prevValueTemp = [...previousValue];
+        const formIndex = previousValue.filtered.findIndex(({ form: { id } }) => id === formId);
+        const previousListOfForms = [...previousValue.filtered];
 
-        if (itemIndex !== -1 && prevValueTemp[itemIndex] && disabled !== undefined) {
-          prevValueTemp[itemIndex].disabled = disabled;
+        if (formIndex !== -1 && previousListOfForms[formIndex] && disabled !== undefined) {
+          previousListOfForms[formIndex].form.disabled = disabled;
         }
-        utils.viewer.appRoutingForms.forms.setData(undefined, prevValueTemp);
+        utils.viewer.appRoutingForms.forms.setData(
+          {},
+          {
+            filtered: previousListOfForms,
+            totalCount: previousValue.totalCount,
+          }
+        );
       }
       return { previousValue };
     },
@@ -289,48 +328,54 @@ export function FormActionsProvider({ appUrl, children }: { appUrl: string; chil
     },
     onError: (err, value, context) => {
       if (context?.previousValue) {
-        utils.viewer.appRoutingForms.forms.setData(undefined, context.previousValue);
+        utils.viewer.appRoutingForms.forms.setData({}, context.previousValue);
       }
-      showToast(t("something_went_wrong"), "error");
+      showToast(err.message || t("something_went_wrong"), "error");
     },
   });
 
   return (
     <>
-      <actionsCtx.Provider
-        value={{
-          appUrl,
-          _delete: {
-            onAction: ({ routingForm }) => {
-              if (!routingForm) {
-                return;
-              }
-              setDeleteDialogOpen(true);
-              setDeleteDialogFormId(routingForm.id);
+      <EmbedDialogProvider>
+        <actionsCtx.Provider
+          value={{
+            appUrl,
+            setNewFormDialogState,
+            newFormDialogState,
+            _delete: {
+              onAction: ({ routingForm }) => {
+                if (!routingForm) {
+                  return;
+                }
+                setDeleteDialogOpen(true);
+                setDeleteDialogFormId(routingForm.id);
+              },
+              isPending: false,
             },
-            isLoading: false,
-          },
-          toggle: {
-            onAction: ({ routingForm, checked }) => {
-              if (!routingForm) {
-                return;
-              }
-              toggleMutation.mutate({
-                ...routingForm,
-                disabled: !checked,
-              });
+            toggle: {
+              onAction: ({ routingForm, checked }) => {
+                if (!routingForm) {
+                  return;
+                }
+                toggleMutation.mutate({
+                  ...routingForm,
+                  disabled: !checked,
+                });
+              },
+              isPending: toggleMutation.isPending,
             },
-            isLoading: toggleMutation.isLoading,
-          },
-        }}>
-        {children}
-      </actionsCtx.Provider>
-      <Dialogs
-        appUrl={appUrl}
-        deleteDialogFormId={deleteDialogFormId}
-        deleteDialogOpen={deleteDialogOpen}
-        setDeleteDialogOpen={setDeleteDialogOpen}
-      />
+          }}>
+          {children}
+        </actionsCtx.Provider>
+        <Dialogs
+          appUrl={appUrl}
+          deleteDialogFormId={deleteDialogFormId}
+          deleteDialogOpen={deleteDialogOpen}
+          setDeleteDialogOpen={setDeleteDialogOpen}
+          newFormDialogState={newFormDialogState}
+          setNewFormDialogState={setNewFormDialogState}
+        />
+      </EmbedDialogProvider>
     </>
   );
 }
@@ -354,7 +399,12 @@ type FormActionProps<T> = {
   //TODO: Provide types here
   action: FormActionType;
   children?: React.ReactNode;
-  render?: (props: { routingForm: RoutingForm | null; className?: string; label?: string }) => JSX.Element;
+  render?: (props: {
+    routingForm: RoutingForm | null;
+    className?: string;
+    label?: string;
+    disabled?: boolean | null | undefined;
+  }) => JSX.Element;
   extraClassNames?: string;
 } & ButtonProps;
 
@@ -370,19 +420,20 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
     extraClassNames,
     ...additionalProps
   } = props;
-  const { appUrl, _delete, toggle } = useContext(actionsCtx);
+  const { appUrl, _delete, toggle, setNewFormDialogState } = useContext(actionsCtx);
   const dropdownCtxValue = useContext(dropdownCtx);
   const dropdown = dropdownCtxValue?.dropdown;
   const embedLink = `forms/${routingForm?.id}`;
-  const formLink = `${CAL_URL}/${embedLink}`;
-  let redirectUrl = `${CAL_URL}/router?form=${routingForm?.id}`;
+  const orgBranding = useOrgBranding();
+
+  const formLink = `${orgBranding?.fullDomain ?? WEBSITE_URL}/${embedLink}`;
+  let redirectUrl = `${orgBranding?.fullDomain ?? WEBSITE_URL}/router?form=${routingForm?.id}`;
 
   routingForm?.fields?.forEach((field) => {
     redirectUrl += `&${getFieldIdentifier(field)}={Recalled_Response_For_This_Field}`;
   });
 
   const { t } = useLocale();
-  const router = useRouter();
   const actionData: Record<
     FormActionType,
     ButtonProps & { as?: React.ElementType; render?: FormActionProps<unknown>["render"] }
@@ -397,13 +448,15 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
       },
     },
     duplicate: {
-      onClick: () => openModal(router, { action: "duplicate", target: routingForm?.id }),
+      onClick: () => setNewFormDialogState?.({ action: "duplicate", target: routingForm?.id ?? null }),
     },
     embed: {
-      as: EmbedButton,
+      as: RoutingFormEmbedButton,
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       //@ts-ignore
       embedUrl: embedLink,
+      // We are okay with namespace clashing here if just in case names clash
+      namespace: slugify((routingForm?.name || "").substring(0, 5)),
     },
     edit: {
       href: `${appUrl}/form-edit/${routingForm?.id}`,
@@ -413,10 +466,10 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
     },
     _delete: {
       onClick: () => _delete.onAction({ routingForm }),
-      loading: _delete.isLoading,
+      loading: _delete.isPending,
     },
     create: {
-      onClick: () => openModal(router, { action: "new" }),
+      onClick: () => setNewFormDialogState?.({ action: "new", target: "" }),
     },
     copyRedirectUrl: {
       onClick: () => {
@@ -425,7 +478,7 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
       },
     },
     toggle: {
-      render: ({ routingForm, label = "", ...restProps }) => {
+      render: ({ routingForm, label = "", disabled, ...restProps }) => {
         if (!routingForm) {
           return <></>;
         }
@@ -433,10 +486,11 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
           <div
             {...restProps}
             className={classNames(
-              "sm:hover:bg-subtle self-center rounded-md p-2 hover:bg-gray-200",
+              "sm:hover:bg-subtle self-center rounded-md p-2 transition hover:bg-gray-200",
               extraClassNames
             )}>
             <Switch
+              disabled={!!disabled}
               checked={!routingForm.disabled}
               label={label}
               onCheckedChange={(checked) => toggle.onAction({ routingForm, checked })}
@@ -445,7 +499,7 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
           </div>
         );
       },
-      loading: toggle.isLoading,
+      loading: toggle.isPending,
     },
   };
 
@@ -455,7 +509,6 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
     ...action,
     ...(additionalProps as ButtonProps),
   } as ButtonProps & { render?: FormActionProps<unknown>["render"] };
-
   if (actionProps.render) {
     return actionProps.render({
       routingForm,
@@ -472,7 +525,7 @@ export const FormAction = forwardRef(function FormAction<T extends typeof Button
     );
   }
   return (
-    <DropdownMenuItem>
+    <DropdownMenuItem className="hover:bg-[initial]">
       <Component
         ref={forwardedRef}
         {...actionProps}

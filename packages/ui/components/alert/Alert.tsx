@@ -1,74 +1,96 @@
+import { cva } from "class-variance-authority";
 import classNames from "classnames";
 import type { ReactNode } from "react";
 import { forwardRef } from "react";
 
-import { CheckCircle2, Info, XCircle, AlertTriangle } from "@calcom/ui/components/icon";
+import { Icon } from "../icon";
+import type { IconName } from "../icon";
+
+export const alertStyles = cva("rounded-[10px] p-3", {
+  variants: {
+    severity: {
+      neutral: "bg-default border-subtle border-[1px] text-default",
+      info: "bg-semantic-info-subtle text-semantic-info",
+      warning: "bg-semantic-attention-subtle text-semantic-attention",
+      error: "bg-semantic-error-subtle text-semantic-error",
+    },
+  },
+  defaultVariants: {
+    severity: "neutral",
+  },
+});
 
 export interface AlertProps {
   title?: ReactNode;
-  // @TODO: Message should be children, more flexible?
   message?: ReactNode;
-  // @TODO: Provide action buttons so style is always the same.
   actions?: ReactNode;
   className?: string;
   iconClassName?: string;
-  // @TODO: Success and info shouldn't exist as per design?
-  severity: "success" | "warning" | "error" | "info" | "neutral";
+  severity: "warning" | "error" | "info" | "neutral";
+  CustomIcon?: IconName;
+  customIconColor?: string;
 }
+
 export const Alert = forwardRef<HTMLDivElement, AlertProps>((props, ref) => {
-  const { severity, iconClassName } = props;
+  const { severity, iconClassName, CustomIcon, customIconColor } = props;
 
   return (
-    <div
-      ref={ref}
-      className={classNames(
-        "rounded-md border border-opacity-20 p-3",
-        props.className,
-        severity === "error" && "border-red-900 bg-red-50 text-red-800",
-        severity === "warning" && "border-yellow-700 bg-yellow-50 text-yellow-700",
-        severity === "info" && "border-sky-700 bg-sky-50 text-sky-700",
-        severity === "success" && "bg-inverted text-inverted",
-        severity === "neutral" && "bg-subtle text-default border-none"
-      )}>
-      <div className="relative flex flex-col md:flex-row">
-        <div className="flex-shrink-0">
-          {severity === "error" && (
-            <XCircle
-              className={classNames("h-5 w-5 fill-red-400 text-white", iconClassName)}
+    <div data-testid="alert" ref={ref} className={alertStyles({ severity, className: props.className })}>
+      <div className="relative flex md:flex-row">
+        {CustomIcon ? (
+          <div className="flex-shrink-0">
+            <Icon
+              name={CustomIcon}
+              data-testid="custom-icon"
               aria-hidden="true"
+              className={classNames(`h4 mr-2 w-4`, iconClassName, customIconColor ?? "text-default")}
             />
-          )}
-          {severity === "warning" && (
-            <AlertTriangle
-              className={classNames("h-5 w-5 fill-yellow-400 text-white", iconClassName)}
-              aria-hidden="true"
-            />
-          )}
-          {severity === "info" && (
-            <Info
-              className={classNames("h-5 w-5 fill-sky-400 text-white", iconClassName)}
-              aria-hidden="true"
-            />
-          )}
-          {severity === "neutral" && (
-            <Info
-              className={classNames("text-default h-5 w-5 fill-transparent", iconClassName)}
-              aria-hidden="true"
-            />
-          )}
-          {severity === "success" && (
-            <CheckCircle2
-              className={classNames("fill-muted h-5 w-5 text-white", iconClassName)}
-              aria-hidden="true"
-            />
+          </div>
+        ) : (
+          <div className={classNames("mr-2 flex-shrink-0", props.title ? "" : "mt-0.5")}>
+            {severity === "error" && (
+              <Icon
+                name="circle-x"
+                data-testid="circle-x"
+                className={classNames("h4 w-4", iconClassName)}
+                aria-hidden="true"
+              />
+            )}
+            {severity === "warning" && (
+              <Icon
+                name="triangle-alert"
+                data-testid="alert-triangle"
+                className={classNames("h4 w-4", iconClassName)}
+                aria-hidden="true"
+              />
+            )}
+            {severity === "info" && (
+              <Icon
+                name="info"
+                data-testid="info"
+                className={classNames("h4 w-4", iconClassName)}
+                aria-hidden="true"
+              />
+            )}
+            {severity === "neutral" && (
+              <Icon
+                name="info"
+                data-testid="neutral"
+                className={classNames("text-default h4 w-4 fill-transparent", iconClassName)}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+        )}
+        <div className="flex flex-grow flex-col sm:flex-row">
+          <div className="space-y-1 ltr:ml-3 rtl:mr-3">
+            {props.title && <h3 className="text-sm font-medium leading-none">{props.title}</h3>}
+            {props.message && <div className="text-sm leading-5">{props.message}</div>}
+          </div>
+          {props.actions && (
+            <div className="ml-auto mt-auto text-sm sm:mt-0 md:relative">{props.actions}</div>
           )}
         </div>
-        <div className="ml-3 flex-grow">
-          <h3 className="text-sm font-medium">{props.title}</h3>
-          <div className="text-sm">{props.message}</div>
-        </div>
-        {/* @TODO: Shouldn't be absolute. This makes it harder to give margin etc. */}
-        {props.actions && <div className="absolute top-1 right-1 text-sm md:relative">{props.actions}</div>}
       </div>
     </div>
   );

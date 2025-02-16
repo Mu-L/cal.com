@@ -1,60 +1,67 @@
 import Link from "next/link";
-import { useRouter } from "next/router";
-import type { ComponentProps } from "react";
 
 import classNames from "@calcom/lib/classNames";
-import { useLocale } from "@calcom/lib/hooks/useLocale";
-import type { SVGComponent } from "@calcom/types/SVGComponent";
+import { useUrlMatchesCurrentUrl } from "@calcom/lib/hooks/useUrlMatchesCurrentUrl";
 
 import { Avatar } from "../../avatar";
-import { SkeletonText } from "../../skeleton";
+import { Icon } from "../../icon";
+import type { IconName } from "../../icon";
 
 export type HorizontalTabItemProps = {
   name: string;
   disabled?: boolean;
   className?: string;
+  target?: string;
   href: string;
-  linkProps?: Omit<ComponentProps<typeof Link>, "href">;
-  icon?: SVGComponent;
+  linkShallow?: boolean;
+  linkScroll?: boolean;
+  icon?: IconName;
   avatar?: string;
+  onClick?: (name: string) => void;
+  isActive?: boolean;
+  "data-testid"?: string;
 };
 
-const HorizontalTabItem = function ({ name, href, linkProps, avatar, ...props }: HorizontalTabItemProps) {
-  const { t, isLocaleReady } = useLocale();
-  const { asPath } = useRouter();
-
-  const isCurrent = asPath === href;
+const HorizontalTabItem = function ({
+  name,
+  href,
+  linkShallow,
+  linkScroll,
+  avatar,
+  ...props
+}: HorizontalTabItemProps) {
+  const isCurrent = useUrlMatchesCurrentUrl(href) || props?.isActive;
 
   return (
     <Link
+      onClick={(e) => {
+        if (props.onClick) {
+          e.preventDefault();
+          props.onClick(name);
+        }
+      }}
       key={name}
       href={href}
-      {...linkProps}
+      shallow={linkShallow}
+      scroll={linkScroll}
+      aria-disabled={props.disabled ? "true" : undefined}
       className={classNames(
-        isCurrent ? "bg-subtle text-emphasis" : "  hover:bg-subtle hover:text-emphasis text-default ",
-        "inline-flex items-center justify-center whitespace-nowrap rounded-[6px] p-2 text-sm font-medium leading-4 md:mb-0",
+        isCurrent ? "bg-subtle text-emphasis" : "hover:bg-muted hover:text-default text-subtle",
+        "inline-flex h-fit items-center justify-center whitespace-nowrap rounded-md p-2 text-sm font-medium leading-none transition md:mb-0",
         props.disabled && "pointer-events-none !opacity-30",
         props.className
       )}
+      target={props.target ? props.target : undefined}
+      data-testid={`horizontal-tab-${props["data-testid"]}`}
       aria-current={isCurrent ? "page" : undefined}>
       {props.icon && (
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        //@ts-ignore
-        <props.icon
-          className={classNames(
-            isCurrent ? "text-emphasis" : "group-hover:text-subtle text-muted",
-            "-ml-0.5 hidden h-4 w-4 ltr:mr-2 rtl:ml-2 sm:inline-block"
-          )}
+        <Icon
+          name={props.icon}
+          className={classNames("-ml-0.5 me-2 hidden h-4 w-4 text-inherit sm:inline-block")}
           aria-hidden="true"
         />
       )}
-      {isLocaleReady ? (
-        <div className="flex items-center gap-x-2">
-          {avatar && <Avatar size="sm" imageSrc={avatar} alt="avatar" />} {t(name)}
-        </div>
-      ) : (
-        <SkeletonText className="h-4 w-24" />
-      )}
+      {avatar && <Avatar size="xs" imageSrc={avatar} alt="avatar" className="-ml-0.5 me-1" />} {name}
     </Link>
   );
 };

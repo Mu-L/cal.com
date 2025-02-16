@@ -1,5 +1,6 @@
-import { useAutoAnimate } from "@formkit/auto-animate/react";
-import { useState } from "react";
+// eslint-disable-next-line no-restricted-imports
+import shuffle from "lodash/shuffle";
+import { useState, memo } from "react";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { localStorage } from "@calcom/lib/webstorage";
@@ -7,76 +8,60 @@ import { Card } from "@calcom/ui";
 
 export const tips = [
   {
-    id: 1,
-    thumbnailUrl: "https://img.youtube.com/vi/60HJt8DOVNo/0.jpg",
-    mediaLink: "https://go.cal.com/dynamic-video",
-    title: "Dynamic booking links",
-    description: "Booking link that allows people to quickly schedule meetings.",
-    href: "https://cal.com/blog/cal-v-1-9",
+    id: 17,
+    thumbnailUrl: "https://img.youtube.com/vi/fMHW6jYPIb8/0.jpg",
+    mediaLink: "https://go.cal.com/embed-video",
+    title: "Embed",
+    description: "Embed your booking page on your website",
+    href: "https://go.cal.com/embed-video",
   },
   {
-    id: 2,
-    thumbnailUrl: "https://img.youtube.com/vi/EAc46SPL6iA/0.jpg",
-    mediaLink: "https://go.cal.com/teams-video",
-    title: "How to set up Teams",
-    description: "Learn how to use round-robin and collective events.",
-    href: "https://cal.com/docs/enterprise-features/teams",
+    id: 16,
+    thumbnailUrl: "https://img.youtube.com/vi/xopxmk2H4Ng/0.jpg",
+    mediaLink: "https://go.cal.com/paid-booking",
+    title: "Paid Bookings",
+    description: "Charge for your time with Cal.com's paid bookings",
+    href: "https://go.cal.com/paid-booking",
   },
   {
-    id: 3,
-    thumbnailUrl: "https://img.youtube.com/vi/c7ZKFuLy1fg/0.jpg",
-    mediaLink: "https://go.cal.com/routing-video",
-    title: "Routing Forms, Workflows",
-    description: "Ask screening questions of potential bookers to connect them with the right person",
-    href: "https://cal.com/blog/cal-v-1-8",
+    id: 15,
+    thumbnailUrl: "https://img.youtube.com/vi/ZjSD1yPgLLQ/0.jpg",
+    mediaLink: "https://go.cal.com/instant-meetings-video",
+    title: "Instant Meetings",
+    description: "Book meetings instantly with a link",
+    href: "https://go.cal.com/instant-meetings-video",
   },
   {
-    id: 4,
-    thumbnailUrl: "https://img.youtube.com/vi/zGr_s-fG84k/0.jpg",
-    mediaLink: "https://go.cal.com/confirmation-video",
-    title: "Requires Confirmation",
-    description: "Learn how to be in charge of your bookings",
-    href: "https://cal.com/resources/feature/opt-in",
+    id: 14,
+    thumbnailUrl: "https://img.youtube.com/vi/IZ4-nUiIpvY/0.jpg",
+    mediaLink: "https://go.cal.com/custom-attributes",
+    title: "Custom Attributes",
+    description: "Define roles and attributes for your teams",
+    href: "https://go.cal.com/custom-attributes",
   },
   {
-    id: 5,
-    thumbnailUrl: "https://img.youtube.com/vi/0v_nQtpxC_4/0.jpg",
-    mediaLink: "https://go.cal.com/payments-video",
-    title: "Accept Payments",
-    description: "Charge for your time with Cal.com's Stripe App",
-    href: "https://app.cal.com/apps/stripe",
+    id: 13,
+    thumbnailUrl: "https://img.youtube.com/vi/TTAASLLPKk0/0.jpg",
+    mediaLink: "https://go.cal.com/ooo-video",
+    title: "ooo.new",
+    description: "Easily go out-of-office",
+    href: "https://go.cal.com/ooo-video",
   },
   {
-    id: 6,
-    thumbnailUrl: "https://img.youtube.com/vi/yGiZo1Ry5-8/0.jpg",
-    mediaLink: "https://go.cal.com/recurring-video",
-    title: "Recurring Bookings",
-    description: "Learn how to create a recurring schedule",
-    href: "https://go.cal.com/recurring-video",
+    id: 12,
+    thumbnailUrl: "https://cal.com/og-image-cal-ai.jpg",
+    mediaLink: "https://go.cal.com/cal-ai",
+    title: "Cal.ai",
+    description: "Your personal AI scheduling assistant",
+    href: "https://go.cal.com/cal-ai",
   },
   {
-    id: 7,
-    thumbnailUrl: "https://img.youtube.com/vi/UVXgo12cY4g/0.jpg",
-    mediaLink: "https://go.cal.com/routing-forms",
-    title: "Routing Forms",
-    description: "Ask questions and route to the correct person",
-    href: "https://go.cal.com/routing-forms",
-  },
-  {
-    id: 8,
-    thumbnailUrl: "https://img.youtube.com/vi/piKlAiibAFo/0.jpg",
-    mediaLink: "https://go.cal.com/workflows",
-    title: "Automate Workflows",
-    description: "Make time work for you and automate tasks",
-    href: "https://go.cal.com/workflows",
-  },
-  {
-    id: 9,
-    thumbnailUrl: "https://img.youtube.com/vi/93iOmzHieCU/0.jpg",
-    mediaLink: "https://go.cal.com/round-robin",
-    title: "Round-Robin",
-    description: "Create advanced group meetings with round-robin",
-    href: "https://go.cal.com/round-robin",
+    id: 11,
+    thumbnailUrl: "https://img.youtube.com/vi/KTg_qzA9NEc/0.jpg",
+    mediaLink: "https://go.cal.com/insights",
+    title: "Insights",
+    description: "Get a better understanding of your business",
+    href: "https://go.cal.com/insights",
   },
   {
     id: 10,
@@ -87,20 +72,82 @@ export const tips = [
     href: "https://go.cal.com/video",
   },
   {
-    id: 11,
-    thumbnailUrl: "https://img.youtube.com/vi/KTg_qzA9NEc/0.jpg",
-    mediaLink: "https://go.cal.com/insights",
-    title: "Insights",
-    description: "Get a better understanding of your business",
-    href: "https://go.cal.com/insights",
+    id: 9,
+    thumbnailUrl: "https://img.youtube.com/vi/93iOmzHieCU/0.jpg",
+    mediaLink: "https://go.cal.com/round-robin",
+    title: "Round-Robin",
+    description: "Create advanced group meetings with round-robin",
+    href: "https://go.cal.com/round-robin",
+  },
+  {
+    id: 8,
+    thumbnailUrl: "https://img.youtube.com/vi/piKlAiibAFo/0.jpg",
+    mediaLink: "https://go.cal.com/workflows",
+    title: "Automate Workflows",
+    description: "Make time work for you and automate tasks",
+    href: "https://go.cal.com/workflows",
+  },
+  {
+    id: 7,
+    thumbnailUrl: "https://img.youtube.com/vi/UVXgo12cY4g/0.jpg",
+    mediaLink: "https://go.cal.com/routing-forms",
+    title: "Routing Forms",
+    description: "Ask questions and route to the correct person",
+    href: "https://go.cal.com/routing-forms",
+  },
+  {
+    id: 6,
+    thumbnailUrl: "https://img.youtube.com/vi/yGiZo1Ry5-8/0.jpg",
+    mediaLink: "https://go.cal.com/recurring-video",
+    title: "Recurring Bookings",
+    description: "Learn how to create a recurring schedule",
+    href: "https://go.cal.com/recurring-video",
+  },
+  {
+    id: 5,
+    thumbnailUrl: "https://img.youtube.com/vi/0v_nQtpxC_4/0.jpg",
+    mediaLink: "https://go.cal.com/payments-video",
+    title: "Accept Payments",
+    description: "Charge for your time with Cal.com's Stripe App",
+    href: "https://app.cal.com/apps/stripe",
+  },
+  {
+    id: 4,
+    thumbnailUrl: "https://img.youtube.com/vi/zGr_s-fG84k/0.jpg",
+    mediaLink: "https://go.cal.com/confirmation-video",
+    title: "Requires Confirmation",
+    description: "Learn how to be in charge of your bookings",
+    href: "https://cal.com/resources/feature/opt-in",
+  },
+  {
+    id: 3,
+    thumbnailUrl: "https://img.youtube.com/vi/-L8MCiT6uhQ/0.jpg",
+    mediaLink: "https://youtu.be/-L8MCiT6uhQ?si=DRJzRNhN85hqAwBl",
+    title: "Routing Forms, Workflows",
+    description: "Ask screening questions of potential bookers to connect them with the right person",
+    href: "https://youtu.be/-L8MCiT6uhQ?si=DRJzRNhN85hqAwBl",
+  },
+  {
+    id: 2,
+    thumbnailUrl: "https://img.youtube.com/vi/EAc46SPL6iA/0.jpg",
+    mediaLink: "https://go.cal.com/teams-video",
+    title: "How to set up Teams",
+    description: "Learn how to use round-robin and collective events.",
+    href: "https://cal.com/docs/enterprise-features/teams",
+  },
+  {
+    id: 1,
+    thumbnailUrl: "https://img.youtube.com/vi/VZ5PfQzzxBw/0.jpg",
+    mediaLink: "https://youtu.be/VZ5PfQzzxBw?si=oB0LPSxG8dWIwg5a",
+    title: "Dynamic booking links",
+    description: "Booking link that allows people to quickly schedule meetings.",
+    href: "https://youtu.be/VZ5PfQzzxBw?si=oB0LPSxG8dWIwg5a",
   },
 ];
 
-const reversedTips = tips.slice(0).reverse();
+const reversedTips = shuffle(tips).slice(0).reverse();
 
-export default function Tips() {
-  const [animationRef] = useAutoAnimate<HTMLDivElement>();
-
+function Tips() {
   const { t } = useLocale();
 
   const [list, setList] = useState<typeof tips>(() => {
@@ -138,7 +185,7 @@ export default function Tips() {
   const baseOriginalList = list.slice(0).reverse();
   return (
     <div
-      className="hidden pt-8 pb-4 lg:grid"
+      className="hidden pb-4 pt-8 lg:grid"
       /* ref={animationRef} */
       style={{
         gridTemplateColumns: "1fr",
@@ -175,3 +222,5 @@ export default function Tips() {
     </div>
   );
 }
+
+export default memo(Tips);

@@ -3,24 +3,22 @@ import { Title } from "@tremor/react";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { trpc } from "@calcom/trpc";
 
-import { useFilterContext } from "../context/provider";
+import { useInsightsParameters } from "../hooks/useInsightsParameters";
 import { CardInsights } from "./Card";
 import { LoadingInsight } from "./LoadingInsights";
 import { TotalBookingUsersTable } from "./TotalBookingUsersTable";
 
 export const MostBookedTeamMembersTable = () => {
   const { t } = useLocale();
-  const { filter } = useFilterContext();
-  const { dateRange, selectedEventTypeId } = filter;
-  const [startDate, endDate] = dateRange;
-  const { selectedTeamId: teamId } = filter;
+  const { isAll, teamId, startDate, endDate, eventTypeId } = useInsightsParameters();
 
-  const { data, isSuccess, isLoading } = trpc.viewer.insights.membersWithMostBookings.useQuery(
+  const { data, isSuccess, isPending } = trpc.viewer.insights.membersWithMostBookings.useQuery(
     {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+      startDate,
+      endDate,
       teamId,
-      eventTypeId: selectedEventTypeId ?? undefined,
+      eventTypeId,
+      isAll,
     },
     {
       staleTime: 30000,
@@ -30,9 +28,9 @@ export const MostBookedTeamMembersTable = () => {
     }
   );
 
-  if (isLoading) return <LoadingInsight />;
+  if (isPending) return <LoadingInsight />;
 
-  if (!isSuccess || !startDate || !endDate || !teamId) return null;
+  if (!isSuccess || !data) return null;
 
   return (
     <CardInsights className="shadow-none">

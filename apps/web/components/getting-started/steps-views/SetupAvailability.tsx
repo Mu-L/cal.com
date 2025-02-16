@@ -1,4 +1,3 @@
-import { useRouter } from "next/router";
 import { useForm } from "react-hook-form";
 
 import { Schedule } from "@calcom/features/schedules";
@@ -8,7 +7,6 @@ import type { TRPCClientErrorLike } from "@calcom/trpc/react";
 import { trpc } from "@calcom/trpc/react";
 import type { AppRouter } from "@calcom/trpc/server/routers/_app";
 import { Button, Form } from "@calcom/ui";
-import { ArrowRight } from "@calcom/ui/components/icon";
 
 interface ISetupAvailabilityProps {
   nextStep: () => void;
@@ -21,16 +19,13 @@ const SetupAvailability = (props: ISetupAvailabilityProps) => {
   const { t } = useLocale();
   const { nextStep } = props;
 
-  const router = useRouter();
-  let queryAvailability;
-  if (defaultScheduleId) {
-    queryAvailability = trpc.viewer.availability.schedule.get.useQuery(
-      { scheduleId: defaultScheduleId },
-      {
-        enabled: router.isReady,
-      }
-    );
-  }
+  const scheduleId = defaultScheduleId === null ? undefined : defaultScheduleId;
+  const queryAvailability = trpc.viewer.availability.schedule.get.useQuery(
+    { scheduleId: defaultScheduleId ?? undefined },
+    {
+      enabled: !!scheduleId,
+    }
+  );
 
   const availabilityForm = useForm({
     defaultValues: {
@@ -50,7 +45,6 @@ const SetupAvailability = (props: ISetupAvailabilityProps) => {
   const updateSchedule = trpc.viewer.availability.schedule.update.useMutation(mutationOptions);
   return (
     <Form
-      className="bg-default dark:text-inverted text-emphasis w-full [--cal-brand-accent:#fafafa] dark:bg-opacity-5"
       form={availabilityForm}
       handleSubmit={async (values) => {
         try {
@@ -73,15 +67,19 @@ const SetupAvailability = (props: ISetupAvailabilityProps) => {
           }
         }
       }}>
-      <Schedule control={availabilityForm.control} name="schedule" weekStart={1} />
+      <div className="bg-default dark:text-inverted text-emphasis border-subtle w-full rounded-md border dark:bg-opacity-5">
+        <Schedule control={availabilityForm.control} name="schedule" weekStart={1} />
+      </div>
 
       <div>
         <Button
+          EndIcon="arrow-right"
           data-testid="save-availability"
           type="submit"
           className="mt-2 w-full justify-center p-2 text-sm sm:mt-8"
+          loading={availabilityForm.formState.isSubmitting}
           disabled={availabilityForm.formState.isSubmitting}>
-          {t("next_step_text")} <ArrowRight className="ml-2 h-4 w-4 self-center" />
+          {t("next_step_text")}
         </Button>
       </div>
     </Form>
